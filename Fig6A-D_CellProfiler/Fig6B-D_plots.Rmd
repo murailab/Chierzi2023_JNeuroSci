@@ -1,0 +1,92 @@
+---
+title: "Astro Transplant In Vitro Analysis"
+author: "Todd Farmer"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    df_print: paged
+    #number_sections: yes
+    toc: yes
+    toc_float: yes
+    code_folding: show
+editor_options:
+  chunk_output_type: inline
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(cache = FALSE,
+                      echo = TRUE,
+                      warning = FALSE, 
+                      message = FALSE, 
+                      cache.lazy = FALSE, 
+                      dev = c("png","pdf"), 
+                      fig.keep = 'high', 
+                      fig.path="figures/", 
+                      fig.show="asis")
+```
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(stringr)
+```
+
+## The image data  
+
+```{r}
+image_data <- read.csv("MyExpt_Image.txt", sep = "\t")   
+image_data
+```
+
+
+## The cell data   
+```{r}
+in_vitro_data <- read.csv("MyExpt_Astros.txt", sep = "\t")
+
+in_vitro_data <- in_vitro_data %>% mutate(Intensity_MeanIntensity_Kir4.1 = Intensity_MeanIntensity_Kir4.1*65535,
+                                          Intensity_MeanIntensity_GFAP = Intensity_MeanIntensity_GFAP*65535)
+```
+
+```{r}
+# reg ex to extract batch id
+in_vitro_data <- in_vitro_data %>%
+   dplyr::mutate(batch = str_extract(FileName_multichannel, "^(\\d{6}_Flask\\d|\\d{6})"))
+```
+
+
+```{r}
+in_vitro_data %>% group_by(batch) %>% summarise(n_cells = n(),
+                                               n_images = n_distinct(FileName_multichannel),
+                                               n_astrocytes = sum(Children_Nuclei_Count > 0),
+                                                sox_percent = sum(Children_Nuclei_Count > 0)/n()*100,
+                                                mean_sox_perCell = mean(Children_Nuclei_Count),
+                                                mean_kir = mean(Intensity_MeanIntensity_Kir4.1),
+                                                mean_gfap = mean(Intensity_MeanIntensity_GFAP))
+```
+
+## Kir4.1 versus batch 
+```{r}
+ggplot(in_vitro_data, aes(x=batch, y=Intensity_MeanIntensity_Kir4.1, color=batch)) +
+  geom_boxplot(alpha=0.5) 
+```
+
+## GFAP versus batch 
+```{r}
+ggplot(in_vitro_data, aes(x=batch, y=Intensity_MeanIntensity_GFAP, color=batch)) +
+  geom_boxplot(alpha=0.5) 
+```
+
+## Kir4.1 and GFAP intensities  
+```{r}
+ggplot(in_vitro_data, aes(x=Intensity_MeanIntensity_GFAP, y=Intensity_MeanIntensity_Kir4.1, color=batch)) +
+  geom_point(alpha=0.5) + 
+  geom_smooth(method = 'lm', formula = y ~ x, se = FALSE)
+```
+
+## Correlation of Kir4.1 vs. GFAP    
+
+```{r}
+cor <- lm(in_vitro_data$Intensity_MeanIntensity_Kir4.1 ~ in_vitro_data$Intensity_MeanIntensity_GFAP)
+summary(cor)
+```
+
+  
